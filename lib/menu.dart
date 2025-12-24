@@ -1,6 +1,23 @@
 // lib/menu.dart
 import 'package:flutter/material.dart';
 
+class DailyBannerSpec {
+  const DailyBannerSpec({
+    required this.asset,
+    required this.finishPos, // (0..1, 0..1) where (0,0)=top-left
+    this.finishOffset = Offset.zero, // pixel nudge
+  });
+
+  final String asset;
+  final Offset finishPos;
+  final Offset finishOffset;
+}
+
+Alignment _alignFromFraction(Offset f) {
+  // Convert (0..1,0..1) -> Alignment(-1..1,-1..1)
+  return Alignment(f.dx * 2 - 1, f.dy * 2 - 1);
+}
+
 class MenuScreen extends StatefulWidget {
   const MenuScreen({
     super.key,
@@ -28,7 +45,6 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> {
-  bool _dailyFinished = false;
   static const _cTop = Color(0xFFC3C0FA);
   static const _cMid = Color(0xFFF4E0F0);
   static const _cNearWhite = Color(0xFFFFFEFE);
@@ -41,7 +57,7 @@ class _MenuScreenState extends State<MenuScreen> {
   int _newsIndex = 0;
 
   final PageController _newsCtrl = PageController(viewportFraction: 1.0);
-
+  final PageController _dailyCtrl = PageController(viewportFraction: 1.0);
 
   // header logo (white)
   static const String _logoAsset = 'asset/heart_icon_logo.png';
@@ -54,9 +70,31 @@ class _MenuScreenState extends State<MenuScreen> {
   static const String _premiumAsset = 'asset/premium.png';
   static const String _calendarAsset = 'asset/calendar.png';
 
-  // daily task icons
-  static const String _cupBigAsset = 'asset/cup_big.png';
-  static const String _cupSmallAsset = 'asset/cup_small.png';
+  // DAILY TASK banners + per-banner FINISH button position
+  // Tweak finishPos per banner to match your design.
+  // dx: 0.0 = left, 1.0 = right
+  // dy: 0.0 = top,  1.0 = bottom
+  static const List<DailyBannerSpec> _dailyBanners = [
+    DailyBannerSpec(
+      asset: 'asset/banner_1.png',
+      finishPos: Offset(0.50, 0.82),
+    ),
+    DailyBannerSpec(
+      asset: 'asset/banner_2.png',
+      finishPos: Offset(0.50, 0.82),
+    ),
+    DailyBannerSpec(
+      asset: 'asset/banner_3.png',
+      finishPos: Offset(0.50, 0.82),
+    ),
+    DailyBannerSpec(
+      asset: 'asset/banner_4.png',
+      finishPos: Offset(0.50, 0.82),
+    ),
+  ];
+
+  // Per-banner finished state
+  late final List<bool> _dailyFinished;
 
   // news images
   static const List<String> _newsAssets = [
@@ -67,7 +105,14 @@ class _MenuScreenState extends State<MenuScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _dailyFinished = List<bool>.filled(_dailyBanners.length, false);
+  }
+
+  @override
   void dispose() {
+    _dailyCtrl.dispose();
     _newsCtrl.dispose();
     super.dispose();
   }
@@ -87,15 +132,12 @@ class _MenuScreenState extends State<MenuScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              // content (scrollable)
               Positioned.fill(
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 78), // space for bottom nav
+                  padding: const EdgeInsets.only(bottom: 78),
                   child: _buildTab(),
                 ),
               ),
-
-              // bottom nav
               Positioned(
                 left: 18,
                 right: 18,
@@ -115,9 +157,8 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget _buildTab() {
     if (_tab == 0) return _PlaceholderTab(title: 'MESSAGE');
     if (_tab == 2) return _PlaceholderTab(title: 'SETTINGS');
+
     return _HomeTab(
-      dailyFinished: _dailyFinished,
-      onToggleDailyFinished: () => setState(() => _dailyFinished = !_dailyFinished),
       logoAsset: _logoAsset,
       scanAsset: _scanAsset,
       hospitalAsset: _hospitalAsset,
@@ -125,15 +166,23 @@ class _MenuScreenState extends State<MenuScreen> {
       historyAsset: _historyAsset,
       premiumAsset: _premiumAsset,
       calendarAsset: _calendarAsset,
-      cupBigAsset: _cupBigAsset,
-      cupSmallAsset: _cupSmallAsset,
-      newsAssets: _newsAssets,
+
+      // DAILY
+      dailyBanners: _dailyBanners,
+      dailyFinished: _dailyFinished,
+      onToggleDailyFinishedAt: (i) => setState(() => _dailyFinished[i] = !_dailyFinished[i]),
       dailyIndex: _dailyIndex,
       onDailyIndexChange: (v) => setState(() => _dailyIndex = v),
+      dailyCtrl: _dailyCtrl,
+
+      // NEWS
+      newsAssets: _newsAssets,
       newsIndex: _newsIndex,
       onNewsIndexChange: (v) => setState(() => _newsIndex = v),
       newsCtrl: _newsCtrl,
+
       accentPink: _accentPink,
+
       onTapScan: widget.onTapScan,
       onTapHospital: widget.onTapHospital,
       onTapTelemedicine: widget.onTapTelemedicine,
@@ -148,8 +197,6 @@ class _MenuScreenState extends State<MenuScreen> {
 
 class _HomeTab extends StatelessWidget {
   const _HomeTab({
-    required this.dailyFinished,
-    required this.onToggleDailyFinished,
     required this.logoAsset,
     required this.scanAsset,
     required this.hospitalAsset,
@@ -157,15 +204,23 @@ class _HomeTab extends StatelessWidget {
     required this.historyAsset,
     required this.premiumAsset,
     required this.calendarAsset,
-    required this.cupBigAsset,
-    required this.cupSmallAsset,
-    required this.newsAssets,
+
+    // DAILY
+    required this.dailyBanners,
+    required this.dailyFinished,
+    required this.onToggleDailyFinishedAt,
     required this.dailyIndex,
     required this.onDailyIndexChange,
+    required this.dailyCtrl,
+
+    // NEWS
+    required this.newsAssets,
     required this.newsIndex,
     required this.onNewsIndexChange,
     required this.newsCtrl,
+
     required this.accentPink,
+
     this.onTapScan,
     this.onTapHospital,
     this.onTapTelemedicine,
@@ -175,8 +230,6 @@ class _HomeTab extends StatelessWidget {
     this.onTapDailyTask,
     this.onTapNewsItem,
   });
-  final bool dailyFinished;
-  final VoidCallback onToggleDailyFinished;
 
   final String logoAsset;
   final String scanAsset;
@@ -186,14 +239,16 @@ class _HomeTab extends StatelessWidget {
   final String premiumAsset;
   final String calendarAsset;
 
-  final String cupBigAsset;
-  final String cupSmallAsset;
-
-  final List<String> newsAssets;
-
+  // DAILY
+  final List<DailyBannerSpec> dailyBanners;
+  final List<bool> dailyFinished;
+  final ValueChanged<int> onToggleDailyFinishedAt;
   final int dailyIndex;
   final ValueChanged<int> onDailyIndexChange;
+  final PageController dailyCtrl;
 
+  // NEWS
+  final List<String> newsAssets;
   final int newsIndex;
   final ValueChanged<int> onNewsIndexChange;
   final PageController newsCtrl;
@@ -222,12 +277,7 @@ class _HomeTab extends StatelessWidget {
             children: [
               ColorFiltered(
                 colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                child: Image.asset(
-                  logoAsset,
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.contain,
-                ),
+                child: Image.asset(logoAsset, width: 40, height: 40, fit: BoxFit.contain),
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -255,57 +305,21 @@ class _HomeTab extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Expanded(
-                        child: _MenuTile(
-                          asset: scanAsset,
-                          label: 'SCAN',
-                          onTap: onTapScan ?? () {},
-                        ),
-                      ),
+                      Expanded(child: _MenuTile(asset: scanAsset, onTap: onTapScan ?? () {})),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: _MenuTile(
-                          asset: hospitalAsset,
-                          label: 'HOSPITAL',
-                          onTap: onTapHospital ?? () {},
-                        ),
-                      ),
+                      Expanded(child: _MenuTile(asset: hospitalAsset, onTap: onTapHospital ?? () {})),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: _MenuTile(
-                          asset: teleAsset,
-                          label: 'TELEMEDICINE',
-                          onTap: onTapTelemedicine ?? () {},
-                        ),
-                      ),
+                      Expanded(child: _MenuTile(asset: teleAsset, onTap: onTapTelemedicine ?? () {})),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(
-                        child: _MenuTile(
-                          asset: historyAsset,
-                          label: 'HISTORY',
-                          onTap: onTapHistory ?? () {},
-                        ),
-                      ),
+                      Expanded(child: _MenuTile(asset: historyAsset, onTap: onTapHistory ?? () {})),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: _MenuTile(
-                          asset: premiumAsset,
-                          label: 'PREMIUM',
-                          onTap: onTapPremium ?? () {},
-                        ),
-                      ),
+                      Expanded(child: _MenuTile(asset: premiumAsset, onTap: onTapPremium ?? () {})),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: _MenuTile(
-                          asset: calendarAsset,
-                          label: 'CALENDAR',
-                          onTap: onTapCalendar ?? () {},
-                        ),
-                      ),
+                      Expanded(child: _MenuTile(asset: calendarAsset, onTap: onTapCalendar ?? () {})),
                     ],
                   ),
                 ],
@@ -316,54 +330,110 @@ class _HomeTab extends StatelessWidget {
           const SizedBox(height: 14),
 
           _SectionPill(title: 'DAILY TASK', color: const Color(0xFFE9CFEA)),
-
           const SizedBox(height: 10),
 
+          // DAILY TASK banner slider + per-banner finish button positioning
           _Card(
-            child: GestureDetector(
-              onTap: onTapDailyTask ?? () {},
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                child: Row(
-                  children: [
-                    Image.asset(cupBigAsset, width: 54, height: 54, fit: BoxFit.contain),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'ดื่มน้ำ 8 แก้ว',
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF333333),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _FinishButton(
-                          finished: dailyFinished,
-                          onToggle: onToggleDailyFinished,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 160, // tweak based on your banner aspect
+                    child: Stack(
+                      children: [
+                        PageView.builder(
+                          controller: dailyCtrl,
+                          itemCount: dailyBanners.length,
+                          onPageChanged: onDailyIndexChange,
+                          itemBuilder: (context, i) {
+                            final spec = dailyBanners[i];
+
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  // Tap banner -> open daily task page
+                                  GestureDetector(
+                                    onTap: onTapDailyTask ?? () {},
+                                    child: Image.asset(spec.asset, fit: BoxFit.cover),
+                                  ),
+
+                                  // FINISH button (per-banner position)
+                                  Align(
+                                    alignment: _alignFromFraction(spec.finishPos),
+                                    child: Transform.translate(
+                                      offset: spec.finishOffset,
+                                      child: _FinishButton(
+                                        finished: dailyFinished[i],
+                                        onToggle: () => onToggleDailyFinishedAt(i),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
 
-                        ],
-                      ),
+                        // left arrow
+                        Positioned(
+                          left: 10,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: _CircleArrow(
+                              onTap: () {
+                                final prev = (dailyIndex - 1).clamp(0, dailyBanners.length - 1);
+                                dailyCtrl.animateToPage(
+                                  prev,
+                                  duration: const Duration(milliseconds: 260),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              },
+                              bg: const Color(0xFFDADADA).withOpacity(0.60),
+                              iconColor: Colors.black,
+                              left: true,
+                            ),
+                          ),
+                        ),
+
+                        // right arrow
+                        Positioned(
+                          right: 10,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: _CircleArrow(
+                              onTap: () {
+                                final next = (dailyIndex + 1).clamp(0, dailyBanners.length - 1);
+                                dailyCtrl.animateToPage(
+                                  next,
+                                  duration: const Duration(milliseconds: 260),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              },
+                              bg: const Color(0xFFDADADA).withOpacity(0.60),
+                              iconColor: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    Image.asset(cupSmallAsset, width: 36, height: 36, fit: BoxFit.contain),
-                    const SizedBox(width: 10),
-                    _CircleArrow(
-                      onTap: onTapDailyTask ?? () {},
-                      bg: const Color(0xFFBFC2FF),
-                      iconColor: Colors.black,
-                    ),
-                  ],
-                ),
+                  ),
+
+                  const SizedBox(height: 6),
+                  _Dots(
+                    count: dailyBanners.length,
+                    index: dailyIndex,
+                    activeColor: accentPink,
+                    inactiveColor: const Color(0xFFD7D7D7),
+                  ),
+                ],
               ),
             ),
           ),
-
-          const SizedBox(height: 8),
-          _Dots(count: 4, index: dailyIndex, activeColor: accentPink, inactiveColor: const Color(0xFFD7D7D7)),
 
           const SizedBox(height: 14),
 
@@ -399,7 +469,6 @@ class _HomeTab extends StatelessWidget {
                           },
                         ),
 
-                        // left arrow
                         Positioned(
                           left: 10,
                           top: 0,
@@ -421,7 +490,6 @@ class _HomeTab extends StatelessWidget {
                           ),
                         ),
 
-                        // right arrow
                         Positioned(
                           right: 10,
                           top: 0,
@@ -455,7 +523,12 @@ class _HomeTab extends StatelessWidget {
           ),
 
           const SizedBox(height: 10),
-          _Dots(count: newsAssets.length, index: newsIndex, activeColor: accentPink, inactiveColor: const Color(0xFFD7D7D7)),
+          _Dots(
+            count: newsAssets.length,
+            index: newsIndex,
+            activeColor: accentPink,
+            inactiveColor: const Color(0xFFD7D7D7),
+          ),
 
           const SizedBox(height: 18),
         ],
@@ -467,13 +540,15 @@ class _HomeTab extends StatelessWidget {
 class _MenuTile extends StatefulWidget {
   const _MenuTile({
     required this.asset,
-    required this.label,
     required this.onTap,
+    this.hoverScale = 1.06,
+    this.pressScale = 0.97,
   });
 
   final String asset;
-  final String label;
   final VoidCallback onTap;
+  final double hoverScale;
+  final double pressScale;
 
   @override
   State<_MenuTile> createState() => _MenuTileState();
@@ -481,55 +556,41 @@ class _MenuTile extends StatefulWidget {
 
 class _MenuTileState extends State<_MenuTile> {
   bool _hover = false;
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
+    final scale = _pressed ? widget.pressScale : (_hover ? widget.hoverScale : 1.0);
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
+      onExit: (_) => setState(() {
+        _hover = false;
+        _pressed = false;
+      }),
       child: GestureDetector(
+        behavior: HitTestBehavior.translucent, // still only hits where child is painted
         onTap: widget.onTap,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTapUp: (_) => setState(() => _pressed = false),
         child: AnimatedScale(
-          scale: _hover ? 1.05 : 1.0,
+          scale: scale,
           duration: const Duration(milliseconds: 140),
           curve: Curves.easeOutBack,
-          child: Container(
-            height: 94,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF6EAF4),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.10),
-                  blurRadius: 10,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(widget.asset, width: 34, height: 34, fit: BoxFit.contain),
-                const SizedBox(height: 8),
-                Text(
-                  widget.label,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF5A2A86),
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ],
-            ),
+          child: Image.asset(
+            widget.asset,
+            fit: BoxFit.contain,
           ),
         ),
       ),
     );
   }
 }
+
+
+
 
 class _Card extends StatelessWidget {
   const _Card({required this.child});
@@ -715,7 +776,6 @@ class _FinishButton extends StatelessWidget {
     );
   }
 }
-
 
 class _BottomNav extends StatelessWidget {
   const _BottomNav({required this.index, required this.onChange});

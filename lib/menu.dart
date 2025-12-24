@@ -28,6 +28,7 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> {
+  bool _dailyFinished = false;
   static const _cTop = Color(0xFFC3C0FA);
   static const _cMid = Color(0xFFF4E0F0);
   static const _cNearWhite = Color(0xFFFFFEFE);
@@ -115,6 +116,8 @@ class _MenuScreenState extends State<MenuScreen> {
     if (_tab == 0) return _PlaceholderTab(title: 'MESSAGE');
     if (_tab == 2) return _PlaceholderTab(title: 'SETTINGS');
     return _HomeTab(
+      dailyFinished: _dailyFinished,
+      onToggleDailyFinished: () => setState(() => _dailyFinished = !_dailyFinished),
       logoAsset: _logoAsset,
       scanAsset: _scanAsset,
       hospitalAsset: _hospitalAsset,
@@ -145,6 +148,8 @@ class _MenuScreenState extends State<MenuScreen> {
 
 class _HomeTab extends StatelessWidget {
   const _HomeTab({
+    required this.dailyFinished,
+    required this.onToggleDailyFinished,
     required this.logoAsset,
     required this.scanAsset,
     required this.hospitalAsset,
@@ -170,6 +175,8 @@ class _HomeTab extends StatelessWidget {
     this.onTapDailyTask,
     this.onTapNewsItem,
   });
+  final bool dailyFinished;
+  final VoidCallback onToggleDailyFinished;
 
   final String logoAsset;
   final String scanAsset;
@@ -321,11 +328,11 @@ class _HomeTab extends StatelessWidget {
                   children: [
                     Image.asset(cupBigAsset, width: 54, height: 54, fit: BoxFit.contain),
                     const SizedBox(width: 10),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Text(
+                          const Text(
                             'ดื่มน้ำ 8 แก้ว',
                             style: TextStyle(
                               fontSize: 26,
@@ -333,8 +340,12 @@ class _HomeTab extends StatelessWidget {
                               color: Color(0xFF333333),
                             ),
                           ),
-                          SizedBox(height: 8),
-                          _FinishButton(),
+                          const SizedBox(height: 8),
+                          _FinishButton(
+                          finished: dailyFinished,
+                          onToggle: onToggleDailyFinished,
+                        ),
+
                         ],
                       ),
                     ),
@@ -644,30 +655,67 @@ class _CircleArrow extends StatelessWidget {
 }
 
 class _FinishButton extends StatelessWidget {
-  const _FinishButton();
+  const _FinishButton({
+    required this.finished,
+    required this.onToggle,
+  });
+
+  final bool finished;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 34,
-      width: 160,
-      decoration: BoxDecoration(
-        color: const Color(0xFFD7D7D7),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      alignment: Alignment.center,
-      child: const Text(
-        'FINISH',
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w900,
-          fontStyle: FontStyle.italic,
-          color: Color(0xFF4B4B4B),
+    final Color bg = finished ? const Color(0xFF9A9CEC) : const Color(0xFFD7D7D7);
+    final Color fg = finished ? Colors.white : const Color(0xFF4B4B4B);
+
+    return GestureDetector(
+      onTap: onToggle,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+        height: 34,
+        width: 160,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            if (finished)
+              BoxShadow(
+                color: bg.withOpacity(0.55),
+                blurRadius: 16,
+                spreadRadius: 1,
+                offset: const Offset(0, 6),
+              ),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 160),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeOutCubic,
+          transitionBuilder: (child, anim) {
+            return FadeTransition(
+              opacity: anim,
+              child: ScaleTransition(scale: anim, child: child),
+            );
+          },
+          child: Text(
+            finished ? 'FINISHED' : 'FINISH',
+            key: ValueKey<bool>(finished),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              fontStyle: FontStyle.italic,
+              color: fg,
+              letterSpacing: 0.4,
+            ),
+          ),
         ),
       ),
     );
   }
 }
+
 
 class _BottomNav extends StatelessWidget {
   const _BottomNav({required this.index, required this.onChange});

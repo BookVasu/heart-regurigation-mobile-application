@@ -1,47 +1,54 @@
-//hello world, code by Vasu Sricharoen
 // lib/main.dart
-import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:flutter/material.dart';
+
 import 'login.dart';
 import 'loading.dart';
 import 'register.dart';
+import 'menu.dart';
 
 void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  static final math.Random rng = math.Random();
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-
-      // Use Builder so we have a context for Navigator in callbacks
       home: Builder(
         builder: (context) {
           return LoginScreen(
             onGetStarted: () => _goToRegisterWithLoading(context),
-            onSignIn: () {
-              // TODO: push your sign-in screen later
-            },
           );
         },
       ),
     );
   }
-}
 
-final math.Random rng = math.Random();
+  void _goToRegisterWithLoading(BuildContext context) {
+    // If your loading widget class is named LoadingScreen instead, swap it here.
+    Navigator.of(context).push(_slideFade(const HeartSplashScreen()));
 
-void _goToRegisterWithLoading(BuildContext context) {
-  Navigator.of(context).push(_slideFade(const HeartSplashScreen()));
+    final int ms = 300 + rng.nextInt(301); // 300..600
+    Future.delayed(Duration(milliseconds: ms), () {
+      if (!context.mounted) return;
 
-  final int ms = 300 + rng.nextInt(301); // int: 300..600
-
-  Future.delayed(Duration(milliseconds: ms), () {
-    if (!context.mounted) return;
-    Navigator.of(context).pushReplacement(_slideFade(const RegisterScreen()));
-  });
+      Navigator.of(context).pushReplacement(
+        _slideFade(
+          RegisterScreen(
+            onBack: () => Navigator.of(context).maybePop(),
+            onCreate: () {
+              // go to menu after create
+              Navigator.of(context).pushReplacement(_slideFade(const MenuScreen()));
+            },
+          ),
+        ),
+      );
+    });
+  }
 }
 
 PageRouteBuilder _slideFade(Widget page) {

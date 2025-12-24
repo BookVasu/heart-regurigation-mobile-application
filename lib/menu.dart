@@ -60,7 +60,7 @@ class _MenuScreenState extends State<MenuScreen> {
   final PageController _dailyCtrl = PageController(viewportFraction: 1.0);
 
   // header logo (white)
-  static const String _logoAsset = 'asset/heart_icon_logo.png';
+  static const String _logoAsset = 'asset/login_logo.png';
 
   // grid icons
   static const String _scanAsset = 'asset/scan.png';
@@ -69,7 +69,9 @@ class _MenuScreenState extends State<MenuScreen> {
   static const String _historyAsset = 'asset/history.png';
   static const String _premiumAsset = 'asset/premium.png';
   static const String _calendarAsset = 'asset/calendar.png';
-
+  static const String _msgSelected = 'asset/message_selected.png';
+  static const String _homeSelected = 'asset/home_selected.png';
+  static const String _settingsSelected = 'asset/settings_selected.png';
   // DAILY TASK banners + per-banner FINISH button position
   // Tweak finishPos per banner to match your design.
   // dx: 0.0 = left, 1.0 = right
@@ -277,14 +279,14 @@ class _HomeTab extends StatelessWidget {
             children: [
               ColorFiltered(
                 colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                child: Image.asset(logoAsset, width: 40, height: 40, fit: BoxFit.contain),
+                child: Image.asset(logoAsset, width: 70, height: 70, fit: BoxFit.contain),
               ),
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
                   'STEMOSCOPE',
                   style: TextStyle(
-                    fontSize: 26,
+                    fontSize: 30,
                     fontWeight: FontWeight.w900,
                     fontStyle: FontStyle.italic,
                     color: Colors.white,
@@ -778,53 +780,94 @@ class _FinishButton extends StatelessWidget {
 }
 
 class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.index, required this.onChange});
+  const _BottomNav({
+    required this.index,
+    required this.onChange,
+    this.height = 78,        // tap area height
+    this.scale = 1.2,       // enlarge PNG (try 1.05..1.35)
+    this.shiftDown = 46,      // move PNG down (try 0..18)
+    this.extraBottom = 12,   // allow PNG to extend down (try 0..30)
+  });
 
   final int index;
   final ValueChanged<int> onChange;
 
-  static const _accentPink = Color(0xFFE85BC2);
+  final double height;
+  final double scale;
+  final double shiftDown;
+  final double extraBottom;
+
+  static const String _msg = 'asset/message_selected.png';
+  static const String _home = 'asset/home_selected.png';
+  static const String _settings = 'asset/settings_selected.png';
+
+  String get _barAsset {
+    switch (index) {
+      case 0:
+        return _msg;
+      case 2:
+        return _settings;
+      case 1:
+      default:
+        return _home;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 66,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.94),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
+    return SizedBox(
+      height: height,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Expanded(
-            child: _NavItem(
-              label: 'MESSAGE',
-              icon: Icons.chat_bubble_outline_rounded,
-              active: index == 0,
-              onTap: () => onChange(0),
+          // BAR IMAGE (can extend below using extraBottom)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: -extraBottom, // allow overflow downward
+            child: Transform.translate(
+              offset: Offset(0, shiftDown),
+              child: Transform.scale(
+                scale: scale,
+                alignment: Alignment.bottomCenter,
+                child: Image.asset(
+                  _barAsset,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.bottomCenter,
+                ),
+              ),
             ),
           ),
-          Expanded(
-            child: _NavItem(
-              label: 'HOME',
-              icon: Icons.home_rounded,
-              active: index == 1,
-              onTap: () => onChange(1),
-              activeColor: _accentPink,
-            ),
-          ),
-          Expanded(
-            child: _NavItem(
-              label: 'SETTINGS',
-              icon: Icons.settings_rounded,
-              active: index == 2,
-              onTap: () => onChange(2),
+
+          // TAP ZONES (3 equal sections)
+          Positioned.fill(
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => onChange(0),
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    hoverColor: Colors.transparent,
+                  ),
+                ),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => onChange(1),
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    hoverColor: Colors.transparent,
+                  ),
+                ),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => onChange(2),
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    hoverColor: Colors.transparent,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -832,49 +875,76 @@ class _BottomNav extends StatelessWidget {
     );
   }
 }
+
+
 
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.label,
-    required this.icon,
+    required this.inactiveIcon,
+    required this.selectedAsset,
     required this.active,
+    required this.hovered,
     required this.onTap,
-    this.activeColor = _activeDefault,
+    required this.onHover,
+    required this.activeColor,
   });
 
-  static const Color _activeDefault = Color(0xFF111111);
-
   final String label;
-  final IconData icon;
+  final IconData inactiveIcon;
+  final String selectedAsset;
+
   final bool active;
+  final bool hovered;
+
   final VoidCallback onTap;
+  final ValueChanged<bool> onHover;
+
   final Color activeColor;
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? activeColor : const Color(0xFF111111);
+    final bool showSelected = active || hovered;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 26),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: color,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => onHover(true),
+      onExit: (_) => onHover(false),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedScale(
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOutBack,
+              scale: hovered ? 1.08 : 1.0,
+              child: showSelected
+                  ? Image.asset(
+                      selectedAsset,
+                      width: 30,
+                      height: 30,
+                      fit: BoxFit.contain,
+                    )
+                  : Icon(inactiveIcon, color: Colors.black, size: 26),
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: showSelected ? activeColor : const Color(0xFF111111),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
+
 
 class _PlaceholderTab extends StatelessWidget {
   const _PlaceholderTab({required this.title});

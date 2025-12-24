@@ -14,7 +14,6 @@ class RegisterScreen extends StatelessWidget {
   final VoidCallback? onCreate;
   final String heartAsset;
 
-  // same gradient family as your other screens
   static const _cTop = Color(0xFFC3C0FA);
   static const _cMid = Color(0xFFF4E0F0);
   static const _cNearWhite = Color(0xFFFFFEFE);
@@ -37,7 +36,6 @@ class RegisterScreen extends StatelessWidget {
         child: SafeArea(
           child: Stack(
             children: [
-              // faint background "report" vibe
               Positioned.fill(
                 child: IgnorePointer(
                   child: Opacity(
@@ -57,7 +55,7 @@ class RegisterScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 70),
 
-                  // Top bar
+
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: Row(
@@ -124,7 +122,6 @@ class RegisterScreen extends StatelessWidget {
 
                                 const SizedBox(height: 18),
 
-                                // CREATE button
                                 GestureDetector(
                                   onTap: onCreate ?? () {},
                                   child: Container(
@@ -162,7 +159,6 @@ class RegisterScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // footer
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 26),
                     child: Column(

@@ -28,7 +28,6 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> {
-  // gradient (same family)
   static const _cTop = Color(0xFFC3C0FA);
   static const _cMid = Color(0xFFF4E0F0);
   static const _cNearWhite = Color(0xFFFFFEFE);
@@ -42,7 +41,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
   final PageController _newsCtrl = PageController(viewportFraction: 1.0);
 
-  // ====== Put your real asset paths here ======
+
   // header logo (white)
   static const String _logoAsset = 'asset/heart_icon_logo.png';
 

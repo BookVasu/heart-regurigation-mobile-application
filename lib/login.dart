@@ -2,7 +2,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart'; // <-- REQUIRED for Ticker
+import 'package:flutter/scheduler.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -17,10 +17,10 @@ class LoginScreen extends StatefulWidget {
   final VoidCallback? onGetStarted;
   final VoidCallback? onSignIn;
 
-  /// Center logo (white icon in your mock). Replace with your real asset if needed.
+
   final String logoAsset;
 
-  /// Falling heart particle asset (same heart is fine).
+
   final String heartAsset;
 
   @override
@@ -28,7 +28,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
-  // Gradient (same as before)
+
   static const _cTop = Color(0xFFC3C0FA);
   static const _cMid = Color(0xFFF4E0F0);
   static const _cNearWhite = Color(0xFFFFFEFE);
@@ -41,17 +41,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   final int _count = 10;
   final List<_HeartParticle> _hearts = [];
 
-  // For dt
+
   Duration _last = Duration.zero;
 
-  // Screen size cache (set by LayoutBuilder)
+
   Size _size = Size.zero;
 
   @override
   void initState() {
     super.initState();
 
-    // init particles (positions will be finalized once we know _size)
     for (int i = 0; i < _count; i++) {
       _hearts.add(_HeartParticle.random(_rng));
     }
@@ -71,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
     if (!mounted) return;
 
-    // Only animate after we know layout size
+
     if (_size == Size.zero) {
       setState(() {});
       return;
@@ -119,7 +118,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             child: SafeArea(
               child: Stack(
                 children: [
-                  // ===== Falling hearts layer (behind everything) =====
+                  // ===== Falling hearts layer=====
                   Positioned.fill(
                     child: IgnorePointer(
                       child: Stack(
@@ -155,8 +154,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   Column(
                     children: [
                       const Spacer(flex: 9),
-
-                      // Center logo (white)
                       ColorFiltered(
                         colorFilter: const ColorFilter.mode(
                           Color.fromARGB(255, 255, 255, 255),
@@ -258,17 +255,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 }
 
 class _HeartParticle {
-  // position
+
   double x = 0;
   double y = 0;
 
-  // visuals
+
   double size = 140;
   double opacity = 0.14;
   double blur = 10;
   double rotation = 0;
 
-  // motion
+
   double speed = 45; // px/s
   double rotSpeed = 0.10; // rad/s
 
@@ -276,23 +273,23 @@ class _HeartParticle {
 
   static _HeartParticle random(math.Random rng) {
     final p = _HeartParticle();
-    p.size = rng.nextDouble() * 110 + 450; // 150..260
-    p.opacity = rng.nextDouble() * 0.10 + 0.08; // 0.08..0.18
-    p.blur = rng.nextDouble() * 5 + 0.4; // 0..0.7
-    p.speed = rng.nextDouble() * 55 + 25; // 25..80
+    p.size = rng.nextDouble() * 110 + 450;
+    p.opacity = rng.nextDouble() * 0.10 + 0.08;
+    p.blur = rng.nextDouble() * 5 + 0.4;
+    p.speed = rng.nextDouble() * 55 + 25;
     p.rotation = rng.nextDouble() * math.pi * 2;
     p.rotSpeed = (rng.nextDouble() * 0.20 + 0.05) * (rng.nextBool() ? 1 : -1);
     return p;
   }
 
   void spawnWithin(math.Random rng, Size s) {
-    // spread across width, start from random y above screen
+
     x = rng.nextDouble() * (s.width) - 60;
-    y = rng.nextDouble() * s.height - 300; // can start slightly above
+    y = rng.nextDouble() * s.height - 300;
   }
 
   void respawn(math.Random rng, Size s) {
-    // new random look (small changes) + reappear at top
+
     size = rng.nextDouble() * 110 + 450;
     opacity = rng.nextDouble() * 0.10 + 0.08;
     blur = rng.nextDouble() * 5 + 0.4;
@@ -301,7 +298,7 @@ class _HeartParticle {
     rotSpeed = (rng.nextDouble() * 0.20 + 0.05) * (rng.nextBool() ? 1 : -1);
 
     x = rng.nextDouble() * (s.width) - 60;
-    y = -rng.nextDouble() * 220 - 300; // start above screen
+    y = -rng.nextDouble() * 220 - 300;
   }
 }
 
@@ -314,7 +311,7 @@ class _PillButton extends StatefulWidget {
     required this.onTap,
     this.leading,
     this.glow = false,
-    this.glowStrength = 1.0, // ✅ NEW
+    this.glowStrength = 1.0,
   });
 
   final String text;
@@ -323,11 +320,11 @@ class _PillButton extends StatefulWidget {
   final VoidCallback onTap;
   final Widget? leading;
 
-  /// If true -> pulsing (sin wave) glow
+
   final bool glow;
 
-  /// 1.0 = default strong glow, 2.0 = very strong, 0.0 = none
-  final double glowStrength; // ✅ NEW
+
+  final double glowStrength;
 
   @override
   State<_PillButton> createState() => _PillButtonState();
@@ -380,7 +377,7 @@ class _PillButtonState extends State<_PillButton> with SingleTickerProviderState
 
   @override
   Widget build(BuildContext context) {
-    final strength = widget.glowStrength; // can be > 1
+    final strength = widget.glowStrength;
     final s = strength <= 0 ? 0.0 : strength;
 
     return MouseRegion(
@@ -390,15 +387,12 @@ class _PillButtonState extends State<_PillButton> with SingleTickerProviderState
       child: AnimatedBuilder(
         animation: _glowCtrl ?? kAlwaysDismissedAnimation,
         builder: (context, child) {
-          // Sin wave 0..1
+
           final t = (_glowCtrl == null)
               ? 0.0
               : (0.5 + 0.5 * math.sin(_glowCtrl!.value * math.pi * 2));
 
-          // Stronger glow mapping
-          // opacity: base 0.25..0.65 (scaled)
-          // blur:    18..46 (scaled)
-          // spread:  1..10  (scaled)
+
           final glowOpacity = widget.glow
               ? _clamp((0.25 + 0.40 * t) * s, 0.0, 0.95)
               : 0.0;
@@ -406,7 +400,6 @@ class _PillButtonState extends State<_PillButton> with SingleTickerProviderState
           final glowBlur = widget.glow ? (18 + 28 * t) * (0.9 + 0.55 * s) : 0.0;
           final glowSpread = widget.glow ? (1 + 9 * t) * (0.7 + 0.65 * s) : 0.0;
 
-          // Make hover also slightly brighten glow
           final hoverBoost = _hovered ? 1.15 : 1.0;
 
           return AnimatedScale(
@@ -420,14 +413,14 @@ class _PillButtonState extends State<_PillButton> with SingleTickerProviderState
                 color: widget.background,
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [
-                  // normal shadow
+
                   BoxShadow(
                     color: Colors.black.withOpacity(0.18),
                     blurRadius: 12,
                     offset: const Offset(0, 6),
                   ),
 
-                  // STRONG glow (uses the button color)
+
                   if (widget.glow && s > 0)
     BoxShadow(
     color: widget.background.withOpacity(
@@ -439,7 +432,7 @@ class _PillButtonState extends State<_PillButton> with SingleTickerProviderState
   ),
 
 
-                  // extra soft outer halo (helps on light backgrounds)
+
                   if (widget.glow && s > 0)
                     BoxShadow(
                       color: Colors.white.withOpacity(_clamp(0.18 * t * s, 0.0, 0.35)),

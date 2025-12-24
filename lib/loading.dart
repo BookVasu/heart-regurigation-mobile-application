@@ -25,7 +25,7 @@ class _HeartSplashScreenState extends State<HeartSplashScreen>
   late final AnimationController _ctrl;
   late final Animation<double> _angle;
 
-  // Your gradient
+
   static const _cTop = Color(0xFFC3C0FA);
   static const _cMid = Color(0xFFF4E0F0);
   static const _cNearWhite = Color(0xFFFFFEFE);
@@ -35,7 +35,7 @@ class _HeartSplashScreenState extends State<HeartSplashScreen>
   void initState() {
     super.initState();
 
-    // Smooth “cool” loop: ease-in/out rotation that reverses (not constant spin)
+
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),

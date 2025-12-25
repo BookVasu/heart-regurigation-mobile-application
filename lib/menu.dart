@@ -1,5 +1,9 @@
 // lib/menu.dart
 import 'package:flutter/material.dart';
+import 'messages.dart';
+import 'oops.dart';
+import 'scan.dart';
+import 'messages.dart';
 
 class DailyBannerSpec {
   const DailyBannerSpec({
@@ -45,6 +49,7 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> {
+  // Background gradient
   static const _cTop = Color(0xFFC3C0FA);
   static const _cMid = Color(0xFFF4E0F0);
   static const _cNearWhite = Color(0xFFFFFEFE);
@@ -59,46 +64,27 @@ class _MenuScreenState extends State<MenuScreen> {
   final PageController _newsCtrl = PageController(viewportFraction: 1.0);
   final PageController _dailyCtrl = PageController(viewportFraction: 1.0);
 
-  // header logo (white)
+  // assets
   static const String _logoAsset = 'asset/login_logo.png';
 
-  // grid icons
   static const String _scanAsset = 'asset/scan.png';
   static const String _hospitalAsset = 'asset/hospital.png';
   static const String _teleAsset = 'asset/telemedicine.png';
   static const String _historyAsset = 'asset/history.png';
   static const String _premiumAsset = 'asset/premium.png';
   static const String _calendarAsset = 'asset/calendar.png';
-  static const String _msgSelected = 'asset/message_selected.png';
-  static const String _homeSelected = 'asset/home_selected.png';
-  static const String _settingsSelected = 'asset/settings_selected.png';
-  // DAILY TASK banners + per-banner FINISH button position
-  // Tweak finishPos per banner to match your design.
-  // dx: 0.0 = left, 1.0 = right
-  // dy: 0.0 = top,  1.0 = bottom
+
+  // daily banners
   static const List<DailyBannerSpec> _dailyBanners = [
-    DailyBannerSpec(
-      asset: 'asset/banner_1.png',
-      finishPos: Offset(0.50, 0.82),
-    ),
-    DailyBannerSpec(
-      asset: 'asset/banner_2.png',
-      finishPos: Offset(0.50, 0.82),
-    ),
-    DailyBannerSpec(
-      asset: 'asset/banner_3.png',
-      finishPos: Offset(0.50, 0.82),
-    ),
-    DailyBannerSpec(
-      asset: 'asset/banner_4.png',
-      finishPos: Offset(0.50, 0.82),
-    ),
+    DailyBannerSpec(asset: 'asset/banner_1.png', finishPos: Offset(0.50, 0.82)),
+    DailyBannerSpec(asset: 'asset/banner_2.png', finishPos: Offset(0.50, 0.82)),
+    DailyBannerSpec(asset: 'asset/banner_3.png', finishPos: Offset(0.50, 0.82)),
+    DailyBannerSpec(asset: 'asset/banner_4.png', finishPos: Offset(0.50, 0.82)),
   ];
 
-  // Per-banner finished state
-  late final List<bool> _dailyFinished;
+  late final List<bool> _dailyFinished = List<bool>.filled(_dailyBanners.length, false);
 
-  // news images
+  // news
   static const List<String> _newsAssets = [
     'asset/news_1.png',
     'asset/news_2.png',
@@ -107,17 +93,40 @@ class _MenuScreenState extends State<MenuScreen> {
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _dailyFinished = List<bool>.filled(_dailyBanners.length, false);
-  }
-
-  @override
   void dispose() {
     _dailyCtrl.dispose();
     _newsCtrl.dispose();
     super.dispose();
   }
+
+  // ---------- Navigation helpers ----------
+
+  void _openOops() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const OopsScreen()),
+    );
+  }
+
+ Future<void> _openScan() async {
+  final selectedTab = await Navigator.of(context).push<int>(
+    MaterialPageRoute(
+      builder: (_) => ScanScreen(
+        bottomNavIndex: _tab,
+        showBottomNav: true,
+        onBackToMenu: () => Navigator.of(context).pop(), // normal back
+      ),
+    ),
+  );
+
+  if (!mounted) return;
+
+  if (selectedTab != null) {
+    setState(() => _tab = selectedTab); // ✅ switches to Messages/Home/Settings correctly
+  }
+}
+
+
+  // ---------- UI ----------
 
   @override
   Widget build(BuildContext context) {
@@ -157,9 +166,10 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Widget _buildTab() {
-    if (_tab == 0) return _PlaceholderTab(title: 'MESSAGE');
-    if (_tab == 2) return _PlaceholderTab(title: 'SETTINGS');
+    if (_tab == 0) return const MessagesTab();
+    if (_tab == 2) return const _PlaceholderTab(title: 'SETTINGS');
 
+    // HOME
     return _HomeTab(
       logoAsset: _logoAsset,
       scanAsset: _scanAsset,
@@ -185,17 +195,37 @@ class _MenuScreenState extends State<MenuScreen> {
 
       accentPink: _accentPink,
 
-      onTapScan: widget.onTapScan,
-      onTapHospital: widget.onTapHospital,
-      onTapTelemedicine: widget.onTapTelemedicine,
-      onTapHistory: widget.onTapHistory,
-      onTapPremium: widget.onTapPremium,
-      onTapCalendar: widget.onTapCalendar,
+      // ✅ buttons
+      onTapScan: () async {
+  final selectedTab = await Navigator.of(context).push<int>(
+    MaterialPageRoute(
+      builder: (_) => ScanScreen(
+        bottomNavIndex: _tab,
+        showBottomNav: true,
+      ),
+    ),
+  );
+
+  if (!mounted) return;
+
+  if (selectedTab != null) {
+    setState(() => _tab = selectedTab); // 0=Message,1=Home,2=Settings
+  }
+},
+
+      onTapHospital: _openOops,
+      onTapTelemedicine: _openOops,
+      onTapHistory: _openOops,
+      onTapPremium: _openOops,
+      onTapCalendar: _openOops,
+
+      // keep yours as-is
       onTapDailyTask: widget.onTapDailyTask,
       onTapNewsItem: widget.onTapNewsItem,
     );
   }
 }
+
 
 class _HomeTab extends StatelessWidget {
   const _HomeTab({
@@ -307,21 +337,91 @@ class _HomeTab extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: _MenuTile(asset: scanAsset, onTap: onTapScan ?? () {})),
+                      Expanded(child: _MenuTile(asset: scanAsset, onTap: () {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (_, __, ___) => ScanScreen(
+        onBackToMenu: () => Navigator.of(context).pop(),
+      ),
+      transitionsBuilder: (_, anim, __, child) {
+        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        final slide = Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero).animate(a);
+        return FadeTransition(opacity: a, child: SlideTransition(position: slide, child: child));
+      },
+    ),
+  );
+},
+)), //scan
                       const SizedBox(width: 12),
-                      Expanded(child: _MenuTile(asset: hospitalAsset, onTap: onTapHospital ?? () {})),
+                      Expanded(child: _MenuTile(asset: hospitalAsset, onTap: () {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, __, ___) => const OopsScreen(),
+      transitionsBuilder: (_, anim, __, child) {
+        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return FadeTransition(opacity: a, child: child);
+      },
+    ),
+  );
+},)), //hospital
                       const SizedBox(width: 12),
-                      Expanded(child: _MenuTile(asset: teleAsset, onTap: onTapTelemedicine ?? () {})),
+                      Expanded(child: _MenuTile(asset: teleAsset, onTap: () {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, __, ___) => const OopsScreen(),
+      transitionsBuilder: (_, anim, __, child) {
+        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return FadeTransition(opacity: a, child: child);
+      },
+    ),
+  );
+},)), //telemedicine
                     ],
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _MenuTile(asset: historyAsset, onTap: onTapHistory ?? () {})),
+                      Expanded(child: _MenuTile(asset: historyAsset, onTap: () {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, __, ___) => const OopsScreen(),
+      transitionsBuilder: (_, anim, __, child) {
+        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return FadeTransition(opacity: a, child: child);
+      },
+    ),
+  );
+},)), //history
                       const SizedBox(width: 12),
-                      Expanded(child: _MenuTile(asset: premiumAsset, onTap: onTapPremium ?? () {})),
+                      Expanded(child: _MenuTile(asset: premiumAsset, onTap: () {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, __, ___) => const OopsScreen(),
+      transitionsBuilder: (_, anim, __, child) {
+        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return FadeTransition(opacity: a, child: child);
+      },
+    ),
+  );
+},)), //premium
                       const SizedBox(width: 12),
-                      Expanded(child: _MenuTile(asset: calendarAsset, onTap: onTapCalendar ?? () {})),
+                      Expanded(child: _MenuTile(asset: calendarAsset, onTap: () {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, __, ___) => const OopsScreen(),
+      transitionsBuilder: (_, anim, __, child) {
+        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return FadeTransition(opacity: a, child: child);
+      },
+    ),
+  );
+},)), //calender
                     ],
                   ),
                 ],

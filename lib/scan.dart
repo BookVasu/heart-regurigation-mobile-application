@@ -319,14 +319,17 @@ class _PickAndRecordView extends StatelessWidget {
             right: 18,
             bottom: 10,
             child: ScanBottomNav(
-              index: bottomNavIndex,
-              onTap: (i) => Navigator.of(context).pop(i),
+  index: bottomNavIndex,
+  onTap: (i) {
+    debugPrint('SCAN bottomNav tapped -> $i');
+    Navigator.of(context).pop(i);
+  },
+  height: 86,
+  scale: 1.18,
+  shiftDown: 8,
+  extraBottom: 14,
+),
 
-              height: 86,
-              scale: 1.18,
-              shiftDown: 8,
-              extraBottom: 14,
-            ),
           ),
 
         // ✅ UI overlay

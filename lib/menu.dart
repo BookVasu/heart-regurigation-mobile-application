@@ -49,7 +49,6 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> {
-  // Background gradient
   static const _cTop = Color(0xFFC3C0FA);
   static const _cMid = Color(0xFFF4E0F0);
   static const _cNearWhite = Color(0xFFFFFEFE);
@@ -64,7 +63,6 @@ class _MenuScreenState extends State<MenuScreen> {
   final PageController _newsCtrl = PageController(viewportFraction: 1.0);
   final PageController _dailyCtrl = PageController(viewportFraction: 1.0);
 
-  // assets
   static const String _logoAsset = 'asset/login_logo.png';
 
   static const String _scanAsset = 'asset/scan.png';
@@ -74,7 +72,6 @@ class _MenuScreenState extends State<MenuScreen> {
   static const String _premiumAsset = 'asset/premium.png';
   static const String _calendarAsset = 'asset/calendar.png';
 
-  // daily banners
   static const List<DailyBannerSpec> _dailyBanners = [
     DailyBannerSpec(asset: 'asset/banner_1.png', finishPos: Offset(0.50, 0.82)),
     DailyBannerSpec(asset: 'asset/banner_2.png', finishPos: Offset(0.50, 0.82)),
@@ -84,7 +81,6 @@ class _MenuScreenState extends State<MenuScreen> {
 
   late final List<bool> _dailyFinished = List<bool>.filled(_dailyBanners.length, false);
 
-  // news
   static const List<String> _newsAssets = [
     'asset/news_1.png',
     'asset/news_2.png',
@@ -99,34 +95,39 @@ class _MenuScreenState extends State<MenuScreen> {
     super.dispose();
   }
 
-  // ---------- Navigation helpers ----------
-
   void _openOops() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const OopsScreen()),
     );
   }
 
- Future<void> _openScan() async {
-  final selectedTab = await Navigator.of(context).push<int>(
-    MaterialPageRoute(
-      builder: (_) => ScanScreen(
-        bottomNavIndex: _tab,
-        showBottomNav: true,
-        onBackToMenu: () => Navigator.of(context).pop(), // normal back
+  Future<void> _openScan() async {
+    debugPrint('MENU: openScan() current _tab=$_tab');
+
+    final selectedTab = await Navigator.of(context).push<int>(
+      MaterialPageRoute(
+        builder: (_) => ScanScreen(
+          bottomNavIndex: _tab,
+          showBottomNav: true,
+
+          // ✅ THIS is the key fix: update menu tab immediately when Scan nav pressed
+          onBottomNavTap: (i) {
+            debugPrint('MENU: onBottomNavTap from Scan -> $i');
+            if (!mounted) return;
+            setState(() => _tab = i);
+          },
+        ),
       ),
-    ),
-  );
+    );
 
-  if (!mounted) return;
+    debugPrint('MENU: received pop result from Scan -> $selectedTab');
 
-  if (selectedTab != null) {
-    setState(() => _tab = selectedTab); // ✅ switches to Messages/Home/Settings correctly
+    if (!mounted) return;
+    if (selectedTab != null) {
+      setState(() => _tab = selectedTab);
+      debugPrint('MENU: setState from pop result _tab=$_tab');
+    }
   }
-}
-
-
-  // ---------- UI ----------
 
   @override
   Widget build(BuildContext context) {
@@ -166,10 +167,11 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Widget _buildTab() {
+    debugPrint('MENU: _buildTab using _tab=$_tab');
+
     if (_tab == 0) return const MessagesTab();
     if (_tab == 2) return const _PlaceholderTab(title: 'SETTINGS');
 
-    // HOME
     return _HomeTab(
       logoAsset: _logoAsset,
       scanAsset: _scanAsset,
@@ -195,36 +197,20 @@ class _MenuScreenState extends State<MenuScreen> {
 
       accentPink: _accentPink,
 
-      // ✅ buttons
-      onTapScan: () async {
-  final selectedTab = await Navigator.of(context).push<int>(
-    MaterialPageRoute(
-      builder: (_) => ScanScreen(
-        bottomNavIndex: _tab,
-        showBottomNav: true,
-      ),
-    ),
-  );
-
-  if (!mounted) return;
-
-  if (selectedTab != null) {
-    setState(() => _tab = selectedTab); // 0=Message,1=Home,2=Settings
-  }
-},
-
+      // ✅ Buttons
+      onTapScan: _openScan,
       onTapHospital: _openOops,
       onTapTelemedicine: _openOops,
       onTapHistory: _openOops,
       onTapPremium: _openOops,
       onTapCalendar: _openOops,
 
-      // keep yours as-is
       onTapDailyTask: widget.onTapDailyTask,
       onTapNewsItem: widget.onTapNewsItem,
     );
   }
 }
+
 
 
 class _HomeTab extends StatelessWidget {
@@ -304,12 +290,17 @@ class _HomeTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // header
+          // Header
           Row(
             children: [
               ColorFiltered(
                 colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                child: Image.asset(logoAsset, width: 70, height: 70, fit: BoxFit.contain),
+                child: Image.asset(
+                  logoAsset,
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.contain,
+                ),
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -329,7 +320,7 @@ class _HomeTab extends StatelessWidget {
 
           const SizedBox(height: 14),
 
-          // grid card
+          // Grid card
           _Card(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
@@ -337,91 +328,51 @@ class _HomeTab extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: _MenuTile(asset: scanAsset, onTap: () {
-  Navigator.of(context).push(
-    PageRouteBuilder(
-      transitionDuration: const Duration(milliseconds: 280),
-      pageBuilder: (_, __, ___) => ScanScreen(
-        onBackToMenu: () => Navigator.of(context).pop(),
-      ),
-      transitionsBuilder: (_, anim, __, child) {
-        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-        final slide = Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero).animate(a);
-        return FadeTransition(opacity: a, child: SlideTransition(position: slide, child: child));
-      },
-    ),
-  );
-},
-)), //scan
+                      Expanded(
+                        child: _MenuTile(
+                          asset: scanAsset,
+                          onTap: onTapScan ?? () {},
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: _MenuTile(asset: hospitalAsset, onTap: () {
-  Navigator.of(context).push(
-    PageRouteBuilder(
-      transitionDuration: const Duration(milliseconds: 260),
-      pageBuilder: (_, __, ___) => const OopsScreen(),
-      transitionsBuilder: (_, anim, __, child) {
-        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-        return FadeTransition(opacity: a, child: child);
-      },
-    ),
-  );
-},)), //hospital
+                      Expanded(
+                        child: _MenuTile(
+                          asset: hospitalAsset,
+                          onTap: onTapHospital ?? () {},
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: _MenuTile(asset: teleAsset, onTap: () {
-  Navigator.of(context).push(
-    PageRouteBuilder(
-      transitionDuration: const Duration(milliseconds: 260),
-      pageBuilder: (_, __, ___) => const OopsScreen(),
-      transitionsBuilder: (_, anim, __, child) {
-        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-        return FadeTransition(opacity: a, child: child);
-      },
-    ),
-  );
-},)), //telemedicine
+                      Expanded(
+                        child: _MenuTile(
+                          asset: teleAsset,
+                          onTap: onTapTelemedicine ?? () {},
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _MenuTile(asset: historyAsset, onTap: () {
-  Navigator.of(context).push(
-    PageRouteBuilder(
-      transitionDuration: const Duration(milliseconds: 260),
-      pageBuilder: (_, __, ___) => const OopsScreen(),
-      transitionsBuilder: (_, anim, __, child) {
-        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-        return FadeTransition(opacity: a, child: child);
-      },
-    ),
-  );
-},)), //history
+                      Expanded(
+                        child: _MenuTile(
+                          asset: historyAsset,
+                          onTap: onTapHistory ?? () {},
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: _MenuTile(asset: premiumAsset, onTap: () {
-  Navigator.of(context).push(
-    PageRouteBuilder(
-      transitionDuration: const Duration(milliseconds: 260),
-      pageBuilder: (_, __, ___) => const OopsScreen(),
-      transitionsBuilder: (_, anim, __, child) {
-        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-        return FadeTransition(opacity: a, child: child);
-      },
-    ),
-  );
-},)), //premium
+                      Expanded(
+                        child: _MenuTile(
+                          asset: premiumAsset,
+                          onTap: onTapPremium ?? () {},
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: _MenuTile(asset: calendarAsset, onTap: () {
-  Navigator.of(context).push(
-    PageRouteBuilder(
-      transitionDuration: const Duration(milliseconds: 260),
-      pageBuilder: (_, __, ___) => const OopsScreen(),
-      transitionsBuilder: (_, anim, __, child) {
-        final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-        return FadeTransition(opacity: a, child: child);
-      },
-    ),
-  );
-},)), //calender
+                      Expanded(
+                        child: _MenuTile(
+                          asset: calendarAsset,
+                          onTap: onTapCalendar ?? () {},
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -434,14 +385,14 @@ class _HomeTab extends StatelessWidget {
           _SectionPill(title: 'DAILY TASK', color: const Color(0xFFE9CFEA)),
           const SizedBox(height: 10),
 
-          // DAILY TASK banner slider + per-banner finish button positioning
+          // DAILY TASK banner slider
           _Card(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
               child: Column(
                 children: [
                   SizedBox(
-                    height: 160, // tweak based on your banner aspect
+                    height: 160,
                     child: Stack(
                       children: [
                         PageView.builder(
@@ -456,13 +407,10 @@ class _HomeTab extends StatelessWidget {
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  // Tap banner -> open daily task page
                                   GestureDetector(
                                     onTap: onTapDailyTask ?? () {},
                                     child: Image.asset(spec.asset, fit: BoxFit.cover),
                                   ),
-
-                                  // FINISH button (per-banner position)
                                   Align(
                                     alignment: _alignFromFraction(spec.finishPos),
                                     child: Transform.translate(
@@ -479,7 +427,6 @@ class _HomeTab extends StatelessWidget {
                           },
                         ),
 
-                        // left arrow
                         Positioned(
                           left: 10,
                           top: 0,
@@ -501,7 +448,6 @@ class _HomeTab extends StatelessWidget {
                           ),
                         ),
 
-                        // right arrow
                         Positioned(
                           right: 10,
                           top: 0,
@@ -542,6 +488,7 @@ class _HomeTab extends StatelessWidget {
           _SectionPill(title: 'NEWS', color: const Color(0xFFBFC2FF)),
           const SizedBox(height: 10),
 
+          // NEWS slider
           _Card(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
@@ -638,6 +585,7 @@ class _HomeTab extends StatelessWidget {
     );
   }
 }
+
 
 class _MenuTile extends StatefulWidget {
   const _MenuTile({

@@ -1,13 +1,25 @@
 // lib/main.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'login.dart';
+import 'signin.dart';
 import 'loading.dart';
 import 'register.dart';
 import 'menu.dart';
 
-void main() => runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ Lock portrait (remove portraitDown if you don’t want upside-down)
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -22,14 +34,42 @@ class MyApp extends StatelessWidget {
         builder: (context) {
           return LoginScreen(
             onGetStarted: () => _goToRegisterWithLoading(context),
+
+            // ✅ add this button in login.dart (onSignIn)
+            onSignIn: () => _goToSignIn(context),
           );
         },
       ),
     );
   }
 
+  // --- FLOWS ---
+
+  void _goToSignIn(BuildContext context) {
+  // show loading first
+  Navigator.of(context).push(_slideFade(const HeartSplashScreen()));
+
+  final int ms = 300 + rng.nextInt(301); // 300..600
+  Future.delayed(Duration(milliseconds: ms), () {
+    if (!context.mounted) return;
+
+    // replace loading with signin
+    Navigator.of(context).pushReplacement(
+      _slideFade(
+        SignInScreen(
+          onBack: () => Navigator.of(context).maybePop(),
+          onLogin: (user, pass) {
+            // TODO: auth later
+            Navigator.of(context).pushReplacement(_slideFade(const MenuScreen()));
+          },
+        ),
+      ),
+    );
+  });
+}
+
+
   void _goToRegisterWithLoading(BuildContext context) {
-    // If your loading widget class is named LoadingScreen instead, swap it here.
     Navigator.of(context).push(_slideFade(const HeartSplashScreen()));
 
     final int ms = 300 + rng.nextInt(301); // 300..600
@@ -41,7 +81,6 @@ class MyApp extends StatelessWidget {
           RegisterScreen(
             onBack: () => Navigator.of(context).maybePop(),
             onCreate: () {
-              // go to menu after create
               Navigator.of(context).pushReplacement(_slideFade(const MenuScreen()));
             },
           ),

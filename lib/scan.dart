@@ -1,5 +1,21 @@
 // lib/scan.dart
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
+
+
+import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
+
+// your existing imports:
+import 'package:flutter/material.dart';
+
+// make sure these exist in your project:
+import 'loading.dart'; // contains HeartSplashScreen (your loading.dart)
+import 'oops.dart';    // contains OopsScreen
+import 'dart:typed_data';
 
 enum ScanStep { pickArea, readyToRecord, result }
 
@@ -12,7 +28,7 @@ class ScanScreen extends StatefulWidget {
     this.showBottomNav = true,
 
     this.guyAsset = 'asset/guy.png',
-    this.logoAsset = 'asset/heart_icon_logo.png',
+    this.logoAsset = 'asset/login_logo.png',
 
     // ✅ background controls
     this.guyWidthFactor = 1.0,   // multiply screen width
@@ -43,15 +59,24 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
+  // --- API ---
+  static const String _baseUrl = 'https://debsirin49513-space-test.hf.space';
+  static const String _analyzeUrl = '$_baseUrl/analyze';
+
+  // --- theme ---
   static const _cTop = Color(0xFFC3C0FA);
   static const _cMid = Color(0xFFF4E0F0);
   static const _cNearWhite = Color(0xFFFFFEFE);
   static const _cWhite = Color(0xFFFFFFFF);
-
   static const _pink = Color(0xFFE85BC2);
 
+  // --- flow ---
   ScanStep _step = ScanStep.pickArea;
   String? _selected;
+
+  // --- result from API ---
+  double? _prob; // 0..1 (higher = more likely abnormal)
+  String? _pickedFileName;
 
   static const Map<String, String> _labels = {
     'A': 'Aortic Area',
@@ -60,7 +85,15 @@ class _ScanScreenState extends State<ScanScreen> {
     'M': 'Mitral Area',
   };
 
+  void _onPick(String k) {
+    setState(() {
+      _selected = k;
+      _step = ScanStep.readyToRecord;
+    });
+  }
+
   void _backPressed() {
+    // from ready -> back to pick screen (doesn't leave Scan)
     if (_step == ScanStep.readyToRecord) {
       setState(() {
         _step = ScanStep.pickArea;
@@ -69,78 +102,132 @@ class _ScanScreenState extends State<ScanScreen> {
       return;
     }
 
-    if (_step == ScanStep.result) {
-      // back to menu
-      if (widget.onBackToMenu != null) {
-        widget.onBackToMenu!.call();
-      } else {
-        Navigator.of(context).maybePop();
-      }
+    // result or pick screen -> back to menu (leave Scan)
+    if (widget.onBackToMenu != null) {
+      widget.onBackToMenu!.call();
+    } else {
+      Navigator.of(context).maybePop();
+    }
+  }
+
+
+Future<Map<String, dynamic>?> _callAnalyzeApiSafe(PlatformFile pf) async {
+  try {
+    final req = http.MultipartRequest('POST', Uri.parse(_analyzeUrl));
+
+    if (pf.bytes != null) {
+      final bytes = Uint8List.fromList(pf.bytes!); // clone out of JS memory
+      req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: pf.name));
+    } else if (pf.path != null) {
+      req.files.add(await http.MultipartFile.fromPath('file', pf.path!, filename: pf.name));
+    } else {
+      return null;
+    }
+
+    final res = await req.send();
+    final body = await res.stream.bytesToString();
+    if (res.statusCode != 200) return null;
+
+    final decoded = jsonDecode(body);
+    if (decoded is! Map) return null;
+    return decoded.cast<String, dynamic>();
+  } catch (_) {
+    // ✅ do not print, do not throw
+    return null;
+  }
+}
+
+
+ Future<void> _onRecord() async {
+  try {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['wav', 'mp3'],
+      withData: true, // ✅ required for web
+    );
+
+    if (picked == null || picked.files.isEmpty) return;
+    final pf = picked.files.single;
+    _pickedFileName = pf.name;
+
+    if (!mounted) return;
+
+    // show loading (do NOT await)
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (_, __, ___) => const HeartSplashScreen(),
+        transitionsBuilder: (_, anim, __, child) {
+          final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+          return FadeTransition(opacity: a, child: child);
+        },
+      ),
+    );
+
+    final jsonMap = await _callAnalyzeApiSafe(pf);
+
+    if (!mounted) return;
+
+    // close loading
+    Navigator.of(context).pop();
+
+    if (jsonMap == null) {
+      // API failed (very likely CORS on web)
+      Navigator.of(context).push(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 260),
+          pageBuilder: (_, __, ___) => const OopsScreen(),
+          transitionsBuilder: (_, anim, __, child) {
+            final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+            return FadeTransition(opacity: a, child: child);
+          },
+        ),
+      );
       return;
     }
 
-    // pickArea -> normal pop
-    Navigator.of(context).maybePop();
-  }
+    final result = (jsonMap['result'] as Map?)?.cast<String, dynamic>();
+    final prob = (result?['probability'] as num?)?.toDouble();
 
-  void _onPick(String key) {
+    if (prob == null) {
+      Navigator.of(context).push(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 260),
+          pageBuilder: (_, __, ___) => const OopsScreen(),
+          transitionsBuilder: (_, anim, __, child) {
+            final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+            return FadeTransition(opacity: a, child: child);
+          },
+        ),
+      );
+      return;
+    }
+
     setState(() {
-      _selected = key;
-      _step = ScanStep.readyToRecord;
+      _prob = prob;
+      _step = ScanStep.result;
     });
-  }
-
-  Future<void> _onRecord() async {
-    // skip file picker for now
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(99)),
-              ),
-              const SizedBox(height: 14),
-              const Text('Select audio file', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 8),
-              const Text(
-                'File picker will be added later.\n(For now, press Continue.)',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF9A9CEC),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-                    elevation: 0,
-                  ),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Continue', style: TextStyle(fontWeight: FontWeight.w900)),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  } catch (e, st) {
+    // ✅ also never throw here
+    debugPrint('SCAN: record flow failed -> $e');
+    debugPrint('$st');
 
     if (!mounted) return;
-    setState(() => _step = ScanStep.result);
-  }
 
-void _handleBottomNavTap(int i) {
-  Navigator.of(context).pop(i); // ✅ return selected tab index
+    // if loading is open, try closing it safely
+    Navigator.of(context).maybePop();
+
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 260),
+        pageBuilder: (_, __, ___) => const OopsScreen(),
+        transitionsBuilder: (_, anim, __, child) {
+          final a = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+          return FadeTransition(opacity: a, child: child);
+        },
+      ),
+    );
+  }
 }
 
 
@@ -160,7 +247,7 @@ void _handleBottomNavTap(int i) {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // ✅ MAIN CONTENT FIRST (so top-left button is NOT blocked)
+              // ✅ MAIN CONTENT FIRST
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 260),
                 switchInCurve: Curves.easeOutCubic,
@@ -168,38 +255,37 @@ void _handleBottomNavTap(int i) {
                 child: _step == ScanStep.result
                     ? _ResultView(
                         key: const ValueKey('result'),
+                        probability: _prob ?? 0.0,
+                        fileName: _pickedFileName,
                         onBackToMenu: widget.onBackToMenu ?? () => Navigator.of(context).maybePop(),
                       )
                     : _PickAndRecordView(
-    key: ValueKey(_step.toString()),
-    step: _step,
-    selected: _selected,
-    onPick: _onPick,
-    onRecord: _onRecord,
-    pink: _pink,
-    label: _selected == null ? null : (_labels[_selected!] ?? ''),
+                        key: ValueKey(_step.toString()),
+                        step: _step,
+                        selected: _selected,
+                        onPick: _onPick,
+                        onRecord: _onRecord,
+                        pink: _pink,
+                        label: _selected == null ? null : (_labels[_selected!] ?? ''),
 
-    guyAsset: widget.guyAsset,
-    guyWidthFactor: widget.guyWidthFactor,
-    guyHeightFactor: widget.guyHeightFactor,
-    guyScale: widget.guyScale,
-    guyOffset: widget.guyOffset,
+                        // background controls
+                        guyAsset: widget.guyAsset,
+                        guyWidthFactor: widget.guyWidthFactor,
+                        guyHeightFactor: widget.guyHeightFactor,
+                        guyScale: widget.guyScale,
+                        guyOffset: widget.guyOffset,
 
-    // ✅ add these
-    showBottomNav: widget.showBottomNav,
-    bottomNavIndex: widget.bottomNavIndex,
-    onBottomNavTap: (i) {
-      if (widget.onBottomNavTap != null) {
-        widget.onBottomNavTap!(i);
-      } else {
-        Navigator.of(context).maybePop();
-      }
-    },
-  ),
-
+                        // bottom nav passthrough (Scan -> Menu)
+                        showBottomNav: widget.showBottomNav,
+                        bottomNavIndex: widget.bottomNavIndex,
+                        onBottomNavTap: (i) {
+                          widget.onBottomNavTap?.call(i); // update Menu immediately (if provided)
+                          Navigator.of(context).pop(i);   // also return int result
+                        },
+                      ),
               ),
 
-              // ✅ TOP BAR ALWAYS ON TOP
+              // ✅ TOP BAR
               Positioned(
                 left: 10,
                 top: 6,
@@ -224,8 +310,6 @@ void _handleBottomNavTap(int i) {
                   icon: const Icon(Icons.menu_rounded),
                 ),
               ),
-
-              // ✅ BOTTOM NAV ON TOP OF BACKGROUND
             ],
           ),
         ),
@@ -233,6 +317,8 @@ void _handleBottomNavTap(int i) {
     );
   }
 }
+
+
 
 class _PickAndRecordView extends StatelessWidget {
   const _PickAndRecordView({
@@ -527,76 +613,129 @@ class _PillAction extends StatelessWidget {
 }
 
 class _ResultView extends StatelessWidget {
-  const _ResultView({super.key, required this.onBackToMenu});
+  const _ResultView({
+    super.key,
+    required this.probability,
+    required this.onBackToMenu,
+    this.fileName,
+  });
+
+  final double probability; // 0..1 (higher => more likely abnormal)
   final VoidCallback onBackToMenu;
+  final String? fileName;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 56),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.92),
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _ResultLine(label: 'Aortic Valve : 88%', value: 0.88),
-                SizedBox(height: 14),
-                _ResultLine(label: 'Tricuspid Valve : 5%', value: 0.05),
-                SizedBox(height: 14),
-                _ResultLine(label: 'Mitral Valve : 3%', value: 0.03),
-                SizedBox(height: 14),
-                _ResultLine(label: 'Pulmonary Valve : 0%', value: 0.0),
-                SizedBox(height: 14),
-                _ResultLine(label: 'Normal : 4%', value: 0.04),
-                SizedBox(height: 18),
-                Text('Result :', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                SizedBox(height: 6),
-                Text('Mitral Valve - Mild Regurgitation', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-                SizedBox(height: 10),
-                Text(
-                  'Base on AI analysis.\nPlease consult a doctor for confirmation.',
-                  style: TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const Spacer(),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-          child: SizedBox(
-            height: 52,
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF9A9CEC),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-                elevation: 0,
+    final p = probability.clamp(0.0, 1.0);
+    final percent = (p * 100).toStringAsFixed(1);
+    final abnormal = p >= 0.5;
+
+    final title = 'ABNORMAL LIKELIHOOD';
+    final message = abnormal
+        ? 'Based on the analysis, this recording has a higher likelihood of abnormal patterns. Please consult a doctor for professional diagnosis.'
+        : 'Based on the analysis, this recording has a low likelihood of abnormal patterns. Keep regular checkups and maintain a healthy lifestyle.';
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 80, 22, 22),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'RESULT',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                fontStyle: FontStyle.italic,
               ),
-              onPressed: onBackToMenu,
-              child: const Text('Back to Menu', style: TextStyle(fontWeight: FontWeight.w900)),
             ),
-          ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '$percent%',
+                    style: TextStyle(
+                      fontSize: 52,
+                      fontWeight: FontWeight.w900,
+                      color: abnormal ? const Color(0xFFE85BC2) : const Color(0xFF2E7D32),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                    ),
+                  ),
+                  if (fileName != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      fileName!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black.withOpacity(0.55),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: 220,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: onBackToMenu,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE85BC2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  elevation: 8,
+                ),
+                child: const Text(
+                  'BACK TO MENU',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontStyle: FontStyle.italic,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
+
 
 class _ResultLine extends StatelessWidget {
   const _ResultLine({required this.label, required this.value});

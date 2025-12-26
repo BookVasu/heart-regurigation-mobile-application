@@ -4,6 +4,7 @@ import 'messages.dart';
 import 'oops.dart';
 import 'scan.dart';
 import 'messages.dart';
+import 'settings.dart';
 
 class DailyBannerSpec {
   const DailyBannerSpec({
@@ -170,7 +171,8 @@ class _MenuScreenState extends State<MenuScreen> {
     debugPrint('MENU: _buildTab using _tab=$_tab');
 
     if (_tab == 0) return const MessagesTab();
-    if (_tab == 2) return const _PlaceholderTab(title: 'SETTINGS');
+    if (_tab == 2) return const SettingsTab();
+
 
     return _HomeTab(
       logoAsset: _logoAsset,

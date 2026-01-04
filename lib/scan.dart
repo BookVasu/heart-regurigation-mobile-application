@@ -116,34 +116,56 @@ Future<Map<String, dynamic>?> _callAnalyzeApiSafe(PlatformFile pf) async {
     final req = http.MultipartRequest('POST', Uri.parse(_analyzeUrl));
 
     if (pf.bytes != null) {
-      final bytes = Uint8List.fromList(pf.bytes!); // clone out of JS memory
-      req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: pf.name));
+      req.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          Uint8List.fromList(pf.bytes!),
+          filename: pf.name,
+        ),
+      );
+    } else if (pf.readStream != null) {
+      req.files.add(
+        http.MultipartFile(
+          'file',
+          pf.readStream!,
+          pf.size,
+          filename: pf.name,
+        ),
+      );
     } else if (pf.path != null) {
       req.files.add(await http.MultipartFile.fromPath('file', pf.path!, filename: pf.name));
     } else {
       return null;
     }
 
-    final res = await req.send();
+    final res = await req.send().timeout(const Duration(seconds: 60));
     final body = await res.stream.bytesToString();
-    if (res.statusCode != 200) return null;
+
+    debugPrint('SCAN API status=${res.statusCode}');
+    if (res.statusCode != 200) {
+      debugPrint('SCAN API body=$body');
+      return null;
+    }
 
     final decoded = jsonDecode(body);
     if (decoded is! Map) return null;
     return decoded.cast<String, dynamic>();
-  } catch (_) {
-    // ✅ do not print, do not throw
+  } catch (e) {
+    debugPrint('SCAN API error: $e');
     return null;
   }
 }
 
 
- Future<void> _onRecord() async {
+
+
+Future<void> _onRecord() async {
   try {
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['wav', 'mp3'],
-      withData: true, // ✅ required for web
+      withData: true,        // ✅ web + sometimes mobile
+      withReadStream: true,  // ✅ REQUIRED for Android content:// cases
     );
 
     if (picked == null || picked.files.isEmpty) return;
@@ -152,7 +174,7 @@ Future<Map<String, dynamic>?> _callAnalyzeApiSafe(PlatformFile pf) async {
 
     if (!mounted) return;
 
-    // show loading (do NOT await)
+    // ✅ open loading
     Navigator.of(context).push(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 220),
@@ -164,15 +186,15 @@ Future<Map<String, dynamic>?> _callAnalyzeApiSafe(PlatformFile pf) async {
       ),
     );
 
+    // ✅ call API
     final jsonMap = await _callAnalyzeApiSafe(pf);
 
     if (!mounted) return;
 
-    // close loading
-    Navigator.of(context).pop();
+    // ✅ close loading safely (only if we can pop)
+    Navigator.of(context).maybePop();
 
     if (jsonMap == null) {
-      // API failed (very likely CORS on web)
       Navigator.of(context).push(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 260),
@@ -208,13 +230,12 @@ Future<Map<String, dynamic>?> _callAnalyzeApiSafe(PlatformFile pf) async {
       _step = ScanStep.result;
     });
   } catch (e, st) {
-    // ✅ also never throw here
     debugPrint('SCAN: record flow failed -> $e');
     debugPrint('$st');
 
     if (!mounted) return;
 
-    // if loading is open, try closing it safely
+    // close loading if it’s open
     Navigator.of(context).maybePop();
 
     Navigator.of(context).push(
@@ -229,6 +250,7 @@ Future<Map<String, dynamic>?> _callAnalyzeApiSafe(PlatformFile pf) async {
     );
   }
 }
+
 
 
   @override
